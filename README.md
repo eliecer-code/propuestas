@@ -1,1 +1,107 @@
-# propuestas
+# Vincular Presupuesto a un Único Modelo de Revit
+
+Para evitar la corrupción de datos y garantizar que los elementos de un modelo de Revit no se mezclen con el presupuesto de otro, es necesario establecer un vínculo unidireccional y exclusivo (1:1) entre el archivo del modelo y el presupuesto almacenado en la base de datos.
+
+A continuación se detalla la propuesta técnica para lograrlo.
+
+---
+
+## 1. Identificación Única del Modelo de Revit
+
+En la API de Revit existen tres formas principales de identificar un archivo de modelo de forma única y persistente.
+
+### Opción A: `ProjectInformation.UniqueId` (Recomendada para flujo general)
+
+Cada archivo de Revit contiene un único elemento que almacena la información del proyecto. Su identificador único (`UniqueId`) es un GUID persistente.
+
+**Código C#:**
+
+```csharp
+doc.ProjectInformation.UniqueId
+```
+
+**Comportamiento:**
+
+* Se mantiene idéntico si el archivo se renombra o se mueve de carpeta.
+* Cambia únicamente si se crea un archivo nuevo desde cero o si se fuerza su recreación.
+
+**Limitación:**
+
+Si un usuario duplica físicamente el archivo `.rvt` en Windows (Copy-Paste) para iniciar otro proyecto derivado, ambos archivos compartirán inicialmente el mismo identificador.
+
+---
+
+### Opción B: `GetWorksharingCentralGUID()` (Recomendada para trabajo colaborativo)
+
+Si el proyecto utiliza trabajo compartido (*Worksharing*) o modelos centrales alojados en servidor local o Autodesk Construction Cloud.
+
+**Código C#:**
+
+```csharp
+doc.GetWorksharingCentralGUID()
+```
+
+**Comportamiento:**
+
+* Devuelve un identificador global único asignado al modelo central.
+* Es la opción más segura para entornos corporativos y colaborativos.
+
+**Limitación:**
+
+Retorna `Guid.Empty` cuando el archivo corresponde a un modelo local de un único usuario sin trabajo colaborativo.
+
+---
+
+### Opción C: Parámetro del Proyecto Personalizado o Extensible Storage
+
+Consiste en almacenar un GUID personalizado generado por el Add-in al momento de vincular el modelo por primera vez.
+
+**Comportamiento:**
+
+Si el Add-in no detecta el parámetro `CQEING_Model_ID`, genera uno nuevo mediante:
+
+```csharp
+Guid.NewGuid().ToString()
+```
+
+Posteriormente lo almacena en el archivo y lo envía a la base de datos.
+
+**Ventajas:**
+
+* Control total sobre la identificación del modelo.
+* Permite implementar funcionalidades de desvinculación o clonación segura cuando un usuario crea una copia del archivo.
+
+> **Recomendación**
+>
+> Utilizar una estrategia híbrida:
+>
+> * Si el modelo es colaborativo, usar `GetWorksharingCentralGUID()`.
+> * Si el modelo no es colaborativo, usar `ProjectInformation.UniqueId`.
+
+---
+
+## 2. Modificación en la Base de Datos (API Web)
+
+En la base de datos (Railway / Prisma), la tabla `Presupuesto` (o la entidad equivalente que almacene la cabecera de la cuantificación) debe incluir un nuevo campo para guardar la identificación única del modelo de Revit asociado.
+
+### Ejemplo en Prisma
+
+```prisma
+model Presupuesto {
+  id             Int      @id @default(autoincrement())
+  codigo         String   @unique
+  descripcion    String
+
+  // Nuevo campo para asociar el modelo de Revit
+  revit_model_id String?  @unique
+
+  // ... resto de campos
+}
+```
+
+### Consideraciones
+
+* `revit_model_id` debe ser opcional (`nullable`) durante la etapa inicial de adopción.
+* Cuando un presupuesto se crea desde la aplicación web o se importa desde una fuente externa, aún no tendrá un modelo de Revit asociado.
+* Una vez que el Add-in vincule el modelo, este campo almacenará el identificador único correspondiente.
+* La restricción `@unique` garantiza que un mismo modelo de Revit no pueda asociarse a múltiples presupuestos.
