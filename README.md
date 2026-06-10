@@ -137,3 +137,68 @@ CREATE TABLE presupuesto (
 * Cuando un presupuesto se crea desde la aplicación web o se importa desde una fuente externa, aún no tendrá un modelo de Revit asociado.
 * Una vez que el Add-in vincule el modelo, este campo almacenará el identificador único correspondiente.
 * La restricción `@unique` garantiza que un mismo modelo de Revit no pueda asociarse a múltiples presupuestos.
+
+
+## 3. Flujo de Validación en el Add-in
+
+Cuando el usuario abre el Add-in y selecciona un presupuesto, el sistema debe validar que dicho presupuesto esté asociado al modelo de Revit actualmente abierto.
+
+### Flujo de Validación
+
+```text
+┌────────────────────────────────────────┐
+│ Usuario carga Presupuesto en el Add-in │
+└────────────────────────────────────────┘
+                    │
+                    ▼
+┌───────────────────────────────────────┐
+│ Obtener ID del Modelo de Revit Activo │
+└───────────────────────────────────────┘
+                    │
+                    ▼
+◇────────────────────────────────────────────◇
+│ ¿El presupuesto ya tiene 'revit_model_id'? │
+◇────────────────────────────────────────────◇
+            │                      │
+           NO                     SÍ
+            │                      │
+            ▼                      ▼
+┌───────────────────────┐    ◇────────────────────────────────◇
+│ Asociar modelo actual │    │ ¿ID en DB == ID Modelo actual? │
+│ y guardar ID en la DB │    ◇────────────────────────────────◇
+└───────────────────────┘                │
+                                         │
+                           ┌─────────────┴─────────────┐
+                           │                           │
+                          SÍ                          NO
+                           │                           │
+                           ▼                           ▼
+             ┌───────────────────────────┐  ┌─────────────────────────────────┐
+             │ Permitir edición y carga  │  │ Bloquear edición y mostrar      │
+             │ de elementos              │  │ alerta de conflicto             │
+             └───────────────────────────┘  └─────────────────────────────────┘
+```
+
+### Reglas de Negocio
+
+1. Cuando un presupuesto no tiene un `revit_model_id` asociado, el Add-in debe vincular automáticamente el presupuesto al modelo de Revit actualmente abierto.
+2. El identificador obtenido del modelo debe almacenarse en la base de datos.
+3. En aperturas posteriores, el Add-in debe comparar el identificador almacenado con el identificador del modelo activo.
+4. Si ambos identificadores coinciden, el usuario puede continuar trabajando normalmente.
+5. Si los identificadores son diferentes, se debe bloquear cualquier operación de asociación, edición o sincronización de elementos para evitar corrupción de datos.
+
+### Mensaje de Alerta Sugerido
+
+> [!CAUTION]
+> **Conflicto de Asociación de Modelo**
+>
+> Este presupuesto ya está vinculado al modelo de Revit con ID **[ID_VINCULADO]**.
+>
+> Estás intentando abrirlo desde el modelo con ID **[ID_ACTUAL]**.
+>
+> Para evitar la corrupción de datos y la mezcla de elementos entre proyectos, se ha bloqueado la asociación y sincronización de elementos en este archivo.
+
+### Resultado Esperado
+
+Con esta validación se garantiza una relación exclusiva **1:1** entre un presupuesto y un modelo de Revit, evitando que elementos de distintos proyectos se mezclen accidentalmente dentro de la misma cuantificación.
+
