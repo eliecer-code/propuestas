@@ -223,7 +223,6 @@ El Add-in envía un objeto JSON que contiene los datos actuales del presupuesto 
   "descripcion": "Presupuesto de prueba 01",
   "fecha": "2026-06-02",
   "revitModelId": "PROJECT_8b51d8e1-d36c-487c-bd5f-682136a6cfb1-00049281",
-  "revit_model_id": "PROJECT_8b51d8e1-d36c-487c-bd5f-682136a6cfb1-00049281"
 }
 ```
 
