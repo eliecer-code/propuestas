@@ -202,3 +202,50 @@ Cuando el usuario abre el Add-in y selecciona un presupuesto, el sistema debe va
 
 Con esta validación se garantiza una relación exclusiva **1:1** entre un presupuesto y un modelo de Revit, evitando que elementos de distintos proyectos se mezclen accidentalmente dentro de la misma cuantificación.
 
+## 4. Actualización del Presupuesto mediante la API
+
+Cuando un presupuesto se vincula por primera vez a un modelo de Revit, el Add-in debe actualizar el campo `revit_model_id` en la API mediante una petición `PUT` al endpoint correspondiente.
+
+### Endpoint
+
+```http
+PUT /api/presupuestos/{codigo_presupuesto}
+```
+
+### Ejemplo de Request Body
+
+El Add-in envía un objeto JSON que contiene los datos actuales del presupuesto junto con el identificador único del modelo de Revit.
+
+```json
+{
+  "codigoPresupuesto": "PROY_001",
+  "nombre": "Presupuesto CQEING 01",
+  "descripcion": "Presupuesto de prueba 01",
+  "fecha": "2026-06-02",
+  "revitModelId": "PROJECT_8b51d8e1-d36c-487c-bd5f-682136a6cfb1-00049281",
+  "revit_model_id": "PROJECT_8b51d8e1-d36c-487c-bd5f-682136a6cfb1-00049281"
+}
+```
+
+### Consideraciones de Implementación
+
+#### Preservación de Datos
+
+Para evitar la pérdida accidental de información, el Add-in debe consultar previamente los datos actuales del presupuesto y reenviarlos en la petición `PUT`.
+
+Esto garantiza que la actualización únicamente agregue o modifique el identificador del modelo de Revit sin afectar el resto de los campos.
+
+#### Campos de Vinculación
+
+El identificador único del modelo se envía en dos formatos:
+
+* `revitModelId` (camelCase)
+* `revit_model_id` (snake_case)
+
+Esta estrategia permite mantener compatibilidad con diferentes convenciones de nomenclatura que puedan existir en la API o en las capas de serialización del backend.
+
+#### Resultado Esperado
+
+Una vez procesada la petición, el presupuesto queda asociado permanentemente al modelo de Revit correspondiente mediante el campo `revit_model_id`, permitiendo que las futuras validaciones de integridad verifiquen la relación exclusiva entre ambos registros.
+
+
