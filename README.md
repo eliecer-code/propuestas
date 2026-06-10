@@ -99,6 +99,38 @@ model Presupuesto {
 }
 ```
 
+### Equivalente en PostgreSQL
+
+Si la tabla ya existe, se puede agregar la columna y la restricción de unicidad mediante una migración:
+
+```sql
+ALTER TABLE presupuesto
+ADD COLUMN revit_model_id VARCHAR(255);
+
+ALTER TABLE presupuesto
+ADD CONSTRAINT uq_presupuesto_revit_model_id
+UNIQUE (revit_model_id);
+```
+
+Si la tabla se crea desde cero, la definición podría ser:
+
+```sql
+CREATE TABLE presupuesto (
+    id SERIAL PRIMARY KEY,
+    codigo VARCHAR(100) NOT NULL UNIQUE,
+    descripcion TEXT,
+    revit_model_id VARCHAR(255) UNIQUE
+);
+```
+
+### Consideraciones
+
+* `revit_model_id` debe ser opcional (`nullable`) durante la etapa inicial de adopción.
+* Cuando un presupuesto se crea desde la aplicación web o se importa desde una fuente externa, aún no tendrá un modelo de Revit asociado.
+* PostgreSQL permite múltiples registros con valor `NULL` en una columna marcada como `UNIQUE`, por lo que varios presupuestos sin vincular pueden coexistir sin conflicto.
+* Una vez asignado un valor a `revit_model_id`, la restricción de unicidad garantiza que un mismo modelo de Revit no pueda asociarse a más de un presupuesto.
+
+
 ### Consideraciones
 
 * `revit_model_id` debe ser opcional (`nullable`) durante la etapa inicial de adopción.
